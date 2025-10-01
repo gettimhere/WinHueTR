@@ -212,26 +212,36 @@ namespace WinHue3.Philips_Hue.BridgeObject
         /// <returns>Contains a list with a single item that details whether the user was added successfully along with the username parameter. Note: If the requested username already exists then the response will report a success.</returns>
         /// <param name="deviceType">Description of the type of device associated with this username. This field must contain the name of your app.</param>
         /// <return>The new API Key.</return>
-        public string CreateUser(string deviceType, bool? generatesteamkey = null)
-        {
-            string url = "http://" + _ipAddress + "/api";
-            User newuser = new User() { devicetype = deviceType, generateclientkey = generatesteamkey };
-            Version current = new Version(ApiVersion);
-            if(current < Version.Parse("1.22"))
-            {
-                newuser.generateclientkey = null;
-            }
-
-            HttpResult comres =HueHttpClient.SendRequest(new Uri(url), WebRequestType.Post, Serializer.CreateJsonObject(newuser));
-
-            if (comres.Success)
-            {
-                LastCommandMessages.AddMessage(Serializer.DeserializeToObject<List<IMessage>>(comres.Data));
-                return LastCommandMessages.Success ? LastCommandMessages.LastSuccess.value : null;
-            }
-            BridgeNotResponding?.Invoke(this, new BridgeNotRespondingEventArgs(this, url, WebExceptionStatus.NameResolutionFailure));
-            return null;
-        }
+public string CreateUser(string deviceType, bool? generatesteamkey = null)
+{
+    string url = "http://" + _ipAddress + "/api";
+    User newuser = new User() { devicetype = deviceType, generateclientkey = generatesteamkey };
+    
+    // Bridge Pro compatibility fix: handle version parsing errors
+    Version current;
+    try
+    {
+        current = new Version(ApiVersion);
+    }
+    catch
+    {
+        // If version parsing fails (Bridge Pro), assume latest compatible API version
+        current = new Version(1, 56, 0);
+    }
+    
+    if(current < Version.Parse("1.22"))
+    {
+        newuser.generateclientkey = null;
+    }
+    HttpResult comres = HueHttpClient.SendRequest(new Uri(url), WebRequestType.Post, Serializer.CreateJsonObject(newuser));
+    if (comres.Success)
+    {
+        LastCommandMessages.AddMessage(Serializer.DeserializeToObject<List<IMessage>>(comres.Data));
+        return LastCommandMessages.Success ? LastCommandMessages.LastSuccess.value : null;
+    }
+    BridgeNotResponding?.Invoke(this, new BridgeNotRespondingEventArgs(this, url, WebExceptionStatus.NameResolutionFailure));
+    return null;
+}
 
         /// <summary>
         /// Creates a new user / Register a new user. The link button on the bridge must be pressed and this command executed within 30 seconds.
